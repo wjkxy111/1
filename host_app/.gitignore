@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Keep runtime and packaging environments local to this directory.
+.venv/
+.venv-build/
+
+# PyInstaller outputs.
+build/
+dist/
+!dist/
+dist/*
+!dist/RA8D1_EDGE_AI_STUDIO/
+*.spec
+
+# Local captures and exports; the curated sample remains tracked.
+sessions/
+exports/

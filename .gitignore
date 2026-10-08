@@ -1,0 +1,7 @@
+# Local build outputs; retain source and CCS project configuration.
+/CPU1_LAUNCHXL_FLASH/
+/CPU1_RAM/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.log

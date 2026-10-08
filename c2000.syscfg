@@ -1,0 +1,143 @@
+/**
+ * F28P65x smart-car hardware configuration (CPU1 / 256ZEJ).
+ *
+ * Safety rule: both motor enable outputs are driven low during Board_init().
+ * Motor power must remain disconnected until HAL_motorEnable(true) is called
+ * deliberately by the application after all self-tests have passed.
+ */
+
+const epwm      = scripting.addModule("/driverlib/epwm.js", {}, false);
+const leftPwm   = epwm.addInstance();
+const rightPwm  = epwm.addInstance();
+const eqep      = scripting.addModule("/driverlib/eqep.js", {}, false);
+const leftQep   = eqep.addInstance();
+const rightQep  = eqep.addInstance();
+const sci       = scripting.addModule("/driverlib/sci.js", {}, false);
+const k230Sci   = sci.addInstance();
+const debugSci  = sci.addInstance();
+const gpio      = scripting.addModule("/driverlib/gpio.js", {}, false);
+const cputimer  = scripting.addModule("/driverlib/cputimer.js", {}, false);
+const tick1ms   = cputimer.addInstance();
+const tick10ms  = cputimer.addInstance();
+
+// F28P65x errata requires EPWMCLKDIV=/1 when software force/clear is used.
+const epwmClockDivider = system.clockTree["EPWMCLKDIV"];
+epwmClockDivider.divideValue = 1;
+
+function addOutput(name, pin, initialValue)
+{
+    const instance = gpio.addInstance();
+    instance.$name = name;
+    instance.direction = "GPIO_DIR_MODE_OUT";
+    instance.writeInitialValue = true;
+    instance.initialValue = initialValue;
+    instance.gpioPin.$assign = pin;
+    return instance;
+}
+
+function addInput(name, pin)
+{
+    const instance = gpio.addInstance();
+    instance.$name = name;
+    instance.direction = "GPIO_DIR_MODE_IN";
+    instance.padConfig = "PULLUP";
+    instance.qualMode = "GPIO_QUAL_3SAMPLE";
+    instance.gpioPin.$assign = pin;
+    return instance;
+}
+
+// 20 kHz edge-aligned PWM at the LaunchPad's 200 MHz EPWM clock.
+leftPwm.$name = "MOTOR_LEFT_PWM";
+leftPwm.useCase = "CUSTOM";
+leftPwm.useInterfacePins = ["EPWM#_A"];
+leftPwm.epwmTimebase_period = 9999;
+leftPwm.epwmTimebase_counterMode = "EPWM_COUNTER_MODE_UP";
+leftPwm.epwmTimebase_clockDiv = "EPWM_CLOCK_DIVIDER_1";
+leftPwm.epwmTimebase_hsClockDiv = "EPWM_HSCLOCK_DIVIDER_1";
+leftPwm.epwmCounterCompare_cmpA = 0;
+leftPwm.epwmCounterCompare_shadowLoadModeCMPA = "EPWM_COMP_LOAD_ON_CNTR_ZERO";
+leftPwm.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_ZERO = "EPWM_AQ_OUTPUT_HIGH";
+leftPwm.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA = "EPWM_AQ_OUTPUT_LOW";
+leftPwm.epwm.$assign = "EPWM1";
+leftPwm.epwm.epwm_aPin.$assign = "GPIO0";
+
+rightPwm.$name = "MOTOR_RIGHT_PWM";
+rightPwm.useCase = "CUSTOM";
+rightPwm.useInterfacePins = ["EPWM#_A"];
+rightPwm.epwmTimebase_period = 9999;
+rightPwm.epwmTimebase_counterMode = "EPWM_COUNTER_MODE_UP";
+rightPwm.epwmTimebase_clockDiv = "EPWM_CLOCK_DIVIDER_1";
+rightPwm.epwmTimebase_hsClockDiv = "EPWM_HSCLOCK_DIVIDER_1";
+rightPwm.epwmCounterCompare_cmpA = 0;
+rightPwm.epwmCounterCompare_shadowLoadModeCMPA = "EPWM_COMP_LOAD_ON_CNTR_ZERO";
+rightPwm.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_ZERO = "EPWM_AQ_OUTPUT_HIGH";
+rightPwm.epwmActionQualifier_EPWM_AQ_OUTPUT_A_ON_TIMEBASE_UP_CMPA = "EPWM_AQ_OUTPUT_LOW";
+rightPwm.epwm.$assign = "EPWM2";
+rightPwm.epwm.epwm_aPin.$assign = "GPIO2";
+
+addOutput("MOTOR_LEFT_DIR",  "GPIO1", 0);
+addOutput("MOTOR_RIGHT_DIR", "GPIO3", 0);
+addOutput("MOTOR_LEFT_EN",   "GPIO6", 0);
+addOutput("MOTOR_RIGHT_EN",  "GPIO7", 0);
+
+leftQep.$name = "ENCODER_LEFT";
+leftQep.useCase = "NO STROBE";
+leftQep.eqepResolution = "EQEP_CONFIG_2X_RESOLUTION";
+leftQep.emulationMode = "EQEP_EMULATIONMODE_RUNFREE";
+leftQep.positionCounterMax = 4294967295;
+leftQep.enableModule = true;
+leftQep.eqep.$assign = "EQEP1";
+leftQep.eqep.eqep_aPin.$assign = "GPIO20";
+leftQep.eqep.eqep_bPin.$assign = "GPIO21";
+
+rightQep.$name = "ENCODER_RIGHT";
+rightQep.useCase = "NO STROBE";
+rightQep.eqepResolution = "EQEP_CONFIG_2X_RESOLUTION";
+rightQep.emulationMode = "EQEP_EMULATIONMODE_RUNFREE";
+rightQep.positionCounterMax = 4294967295;
+rightQep.enableModule = true;
+rightQep.eqep.$assign = "EQEP2";
+rightQep.eqep.eqep_aPin.$assign = "GPIO24";
+rightQep.eqep.eqep_bPin.$assign = "GPIO79";
+
+addInput("TRACK_0", "GPIO8");
+addInput("TRACK_1", "GPIO9");
+addInput("TRACK_2", "GPIO10");
+addInput("TRACK_3", "GPIO11");
+addInput("TRACK_4", "GPIO14");
+addInput("TRACK_5", "GPIO15");
+addInput("TRACK_6", "GPIO16");
+addInput("TRACK_7", "GPIO17");
+
+k230Sci.$name = "K230_SCI";
+k230Sci.baudRates = 115200;
+k230Sci.sci.$assign = "SCIB";
+k230Sci.sci.sci_txPin.$assign = "GPIO38";
+k230Sci.sci.sci_rxPin.$assign = "GPIO55";
+
+debugSci.$name = "DEBUG_SCI";
+debugSci.baudRates = 115200;
+debugSci.sci.$assign = "SCIA";
+debugSci.sci.sci_txPin.$assign = "GPIO42";
+debugSci.sci.sci_rxPin.$assign = "GPIO43";
+
+// CPU Timer periods are expressed in SYSCLK cycles (200 MHz).
+tick1ms.$name = "CONTROL_TICK_1MS";
+tick1ms.cputimerBase = "CPUTIMER0_BASE";
+tick1ms.timerPeriod = 200000;
+tick1ms.emulationMode = "CPUTIMER_EMULATIONMODE_RUNFREE";
+tick1ms.enableInterrupt = false;
+tick1ms.startTimer = true;
+
+tick10ms.$name = "SERVICE_TICK_10MS";
+tick10ms.cputimerBase = "CPUTIMER1_BASE";
+tick10ms.timerPeriod = 2000000;
+tick10ms.emulationMode = "CPUTIMER_EMULATIONMODE_RUNFREE";
+tick10ms.enableInterrupt = false;
+tick10ms.startTimer = true;
+
+/**
+ * These arguments are consumed by both the SysConfig GUI and CLI.
+ * @cliArgs --device "TMS320F28P650DK" --package "256ZEJ" --variant "TMS320F28P650DK9" --context "CPU1" --product "C2000WARE@26.01.00.00"
+ * @versions {"tool":"1.28.0"}
+ */

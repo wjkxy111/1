@@ -1,0 +1,2 @@
+# Tkinter is part of the standard CPython distribution and is not installed by pip.
+pyserial>=3.5,<4
